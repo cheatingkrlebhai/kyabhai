@@ -1,0 +1,106 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Step 1: Create Sample Dataset
+data = {
+    'Date': pd.date_range(start='2023-01-01', periods=10, freq='D'),
+    'Close': [100, 102, 101, 103, 105, 104, 106, 108, 107, 109]
+}
+
+df = pd.DataFrame(data)
+df.set_index('Date', inplace=True)
+print("Sample Dataset:")
+print(df)
+
+# Step 2: Calculate Moving Averages
+df['MA_5'] = df['Close'].rolling(window=5).mean()
+df['MA_3'] = df['Close'].rolling(window=3).mean()
+
+# Step 3: Generate Signals
+# Buy Signal: When MA_3 crosses above MA_5
+# Sell Signal: When MA_3 crosses below MA_5
+
+df['Signal'] = 0  # Initialize Signal column
+
+# Iterate through the dataframe to identify crossovers
+for i in range(1, len(df)):
+    if pd.notna(df['MA_3'].iloc[i-1]) and pd.notna(df['MA_5'].iloc[i-1]):
+        # Previous day
+        prev_ma3 = df['MA_3'].iloc[i-1]
+        prev_ma5 = df['MA_5'].iloc[i-1]
+        
+        # Current day
+        curr_ma3 = df['MA_3'].iloc[i]
+        curr_ma5 = df['MA_5'].iloc[i]
+        
+        # Check for crossover
+        if prev_ma3 <= prev_ma5 and curr_ma3 > curr_ma5:
+            df['Signal'].iloc[i] = 1  # Buy
+        elif prev_ma3 >= prev_ma5 and curr_ma3 < curr_ma5:
+            df['Signal'].iloc[i] = -1  # Sell
+
+print("\nDataset with Moving Averages and Signals:")
+print(df)
+
+# Step 4: Simulate Trades and Calculate Profit
+initial_cash = 1000  # Starting with $1000
+cash = initial_cash
+position = 0  # Number of shares held
+profit = 0
+
+trade_log = []
+
+for i in range(len(df)):
+    signal = df['Signal'].iloc[i]
+    price = df['Close'].iloc[i]
+    date = df.index[i]
+    
+    if signal == 1 and cash >= price:
+        # Buy one share
+        position += 1
+        cash -= price
+        trade_log.append({'Date': date, 'Action': 'Buy', 'Price': price, 'Position': position, 'Cash': cash})
+        print(f"{date.date()} - Buy at ${price}")
+        
+    elif signal == -1 and position > 0:
+        # Sell all shares
+        cash += position * price
+        trade_log.append({'Date': date, 'Action': 'Sell', 'Price': price, 'Position': 0, 'Cash': cash})
+        print(f"{date.date()} - Sell at ${price} (Position closed)")
+        position = 0
+
+# Final Portfolio Value
+final_portfolio = cash + position * df['Close'].iloc[-1]
+profit = final_portfolio - initial_cash
+
+print(f"\nInitial Cash: ${initial_cash}")
+print(f"Final Cash: ${cash}")
+print(f"Final Position: {position} shares")
+print(f"Final Portfolio Value: ${final_portfolio}")
+print(f"Total Profit: ${profit}")
+
+# Step 5: Visualization
+plt.figure(figsize=(14, 7))
+plt.plot(df.index, df['Close'], label='Close Price', color='black')
+plt.plot(df.index, df['MA_5'], label='5-Day MA', color='blue', linestyle='--')
+plt.plot(df.index, df['MA_3'], label='3-Day MA', color='orange', linestyle='--')
+
+# Plot Buy Signals
+buy_signals = df[df['Signal'] == 1]
+plt.scatter(buy_signals.index, buy_signals['Close'], marker='^', color='green', label='Buy Signal', s=100)
+
+# Plot Sell Signals
+sell_signals = df[df['Signal'] == -1]
+plt.scatter(sell_signals.index, sell_signals['Close'], marker='v', color='red', label='Sell Signal', s=100)
+
+plt.title('5-Day and 3-Day Moving Average Crossover Strategy')
+plt.xlabel('Date')
+plt.ylabel('Price ($)')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Optional: Display Trade Log
+trade_df = pd.DataFrame(trade_log)
+print("\nTrade Log:")
+print(trade_df)
