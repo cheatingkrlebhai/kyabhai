@@ -1,0 +1,89 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy.stats import chisquare
+
+# Step 1: Create or Load Your Dataset
+# For demonstration, we'll create a sample dataset with stock prices over 10 days
+data = {
+    'Date': pd.date_range(start='2023-01-01', periods=10, freq='D'),
+    'Close': [100, 102, 101, 103, 105, 104, 106, 108, 107, 109]
+}
+
+df = pd.DataFrame(data)
+print("Sample Dataset:")
+print(df)
+
+# If you have your own dataset, uncomment the following lines and adjust the file path and column name
+# df = pd.read_csv('your_dataset.csv')  # Replace with your file path
+# numerical_column = 'YourNumericColumn'  # Replace with your numeric column name
+
+# For this example, we'll use the 'Close' column
+numerical_column = 'Close'
+
+# Step 2: Data Cleaning
+# Ensure that the numerical column exists
+if numerical_column not in df.columns:
+    raise KeyError(f"Column '{numerical_column}' not found in the dataset.")
+
+# Remove non-positive numbers as Benford's Law applies to positive, non-zero numbers
+df = df[df[numerical_column] > 0]
+
+# Step 3: Convert Numbers to Strings and Extract First Digits
+def extract_first_digit(number):
+    return str(number)[0]
+
+df['First_Digit'] = df[numerical_column].apply(extract_first_digit).astype(int)
+
+print("\nDataset with First Digits:")
+print(df[['Date', numerical_column, 'First_Digit']])
+
+# Step 4: Calculate Observed Frequencies
+observed_counts = df['First_Digit'].value_counts().sort_index()
+observed_freq = observed_counts / observed_counts.sum()
+
+print("\nObserved Frequencies:")
+print(observed_freq)
+
+# Step 5: Define Benford's Expected Frequencies
+benford_probs = np.log10(1 + 1 / np.arange(1, 10))
+benford_freq = pd.Series(benford_probs, index=np.arange(1, 10))
+
+print("\nBenford's Expected Frequencies:")
+print(benford_freq)
+
+# Step 6: Align Observed and Expected Frequencies
+# Ensure all digits from 1 to 9 are present in observed_counts
+for digit in range(1, 10):
+    if digit not in observed_counts:
+        observed_counts[digit] = 0
+
+# Sort the index
+observed_counts = observed_counts.sort_index()
+observed_freq = observed_counts / observed_counts.sum()
+
+# Step 7: Plotting the Distributions
+plt.figure(figsize=(10, 6))
+sns.barplot(x=observed_freq.index, y=observed_freq.values, color='skyblue', label='Observed')
+sns.lineplot(x=benford_freq.index, y=benford_freq.values, color='red', marker='o', label="Benford's Law")
+plt.xlabel('First Digit')
+plt.ylabel('Frequency')
+plt.title('Benford\'s Law Analysis')
+plt.legend()
+plt.show()
+
+# Step 8: Statistical Test (Chi-Squared Test)
+# For Chi-Squared, we need expected counts based on Benford's probabilities
+total_counts = observed_counts.sum()
+expected_counts = benford_freq.values * total_counts
+
+chi_stat, p_value = chisquare(f_obs=observed_counts.values, f_exp=expected_counts)
+
+print(f"\nChi-Squared Statistic: {chi_stat:.4f}")
+print(f"P-Value: {p_value:.4f}")
+
+if p_value < 0.05:
+    print("Result: The data does NOT conform to Benford's Law (reject H0).")
+else:
+    print("Result: The data conforms to Benford's Law (fail to reject H0).")
