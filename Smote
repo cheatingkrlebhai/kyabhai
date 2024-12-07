@@ -1,0 +1,51 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve
+from imblearn.over_sampling import SMOTE
+import matplotlib.pyplot as plt
+
+# Step 1: Load Dataset
+# Replace 'your_dataset.csv' with your actual file
+df = pd.read_csv('your_dataset.csv')
+
+# Step 2: Split features and target
+X = df.drop(columns=['Class'])  # Replace 'Class' with the fraud label column name
+y = df['Class']
+
+# Step 3: Train-Test Split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42, stratify=y)
+
+# Step 4: Handle Imbalance using SMOTE
+smote = SMOTE(random_state=42)
+X_train_resampled, y_train_resampled = smote.fit_resample(X_train, y_train)
+
+# Step 5: Train Model
+model = RandomForestClassifier(random_state=42)
+model.fit(X_train_resampled, y_train_resampled)
+
+# Step 6: Prediction
+y_pred = model.predict(X_test)
+y_pred_proba = model.predict_proba(X_test)[:, 1]
+
+# Step 7: Evaluation
+print("Confusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred))
+
+# AUC-ROC Score
+roc_auc = roc_auc_score(y_test, y_pred_proba)
+print(f"\nAUC-ROC Score: {roc_auc}")
+
+# Step 8: Plot ROC Curve
+fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
+plt.plot(fpr, tpr, label=f"AUC = {roc_auc:.2f}")
+plt.plot([0, 1], [0, 1], 'r--')
+plt.title("ROC Curve")
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.legend()
+plt.show()
